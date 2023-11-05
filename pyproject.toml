@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "toy-redis"
+version = "0.1.0"
+description = "Toy redis exercise"
+authors = ["Alex Guerra"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+redis = "^5.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.pydocstyle]
+ignore = ["D101"]
+
+[tool.mypy]
+exclude = ["tests"]
