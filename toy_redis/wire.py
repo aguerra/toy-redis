@@ -4,8 +4,8 @@ from asyncio import StreamReader, StreamWriter
 from collections.abc import Sequence
 from functools import singledispatch
 
-Collection = Sequence['Serializable']
-Serializable = None | int | str | bytes | Exception | Collection
+SerializableSequence = Sequence['Serializable']
+Serializable = None | int | str | bytes | Exception | SerializableSequence
 
 
 async def _decode_until_crlf(reader: StreamReader) -> str:
