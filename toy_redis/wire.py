@@ -91,10 +91,9 @@ def _(obj: Exception) -> bytes:
 def _(obj: Sequence) -> bytes:
     length = len(obj)
     header = f'*{length}\r\n'.encode()
-    buf = bytearray(header)
-    for item in obj:
-        buf.extend(_to_bytes(item))
-    return buf
+    obj_data = b''.join(_to_bytes(item) for item in obj)
+    data = b''.join([header, obj_data])
+    return data
 
 
 async def dump(obj: Serializable, writer: StreamWriter) -> None:
