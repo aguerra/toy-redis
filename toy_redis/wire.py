@@ -14,41 +14,63 @@ async def _decode_until_crlf(reader: StreamReader) -> str:
     return trimmed.decode()
 
 
-def _validate_prefix(expected: bytes, prefix: bytes) -> None:
-    if prefix != expected:
-        raise ValueError('Wrong prefix {prefix!r}')
-
-
-async def _load_bulk_string(reader: StreamReader) -> bytes:
-    prefix = await reader.read(1)
-    _validate_prefix(b'$', prefix)
+async def _load_bulk_string(reader: StreamReader) -> bytes | None:
     string = await _decode_until_crlf(reader)
-    length = int(string) + 2
-    data = await reader.read(length)
+    length = int(string)
+    if length == -1:
+        return None
+    data = await reader.read(length + 2)
     return data[:-2]
 
 
-async def _load_array_bulk_string(prefix: bytes,
-                                  reader: StreamReader
-                                  ) -> Sequence[bytes]:
-    _validate_prefix(b'*', prefix)
+async def _load_array(reader: StreamReader) -> SerializableSequence:
     string = await _decode_until_crlf(reader)
     length = int(string)
-    obj = [await _load_bulk_string(reader) for _ in range(length)]
+    obj = [await _load(reader) for _ in range(length)]
     return obj
+
+
+async def _load_string(reader: StreamReader) -> str:
+    return await _decode_until_crlf(reader)
+
+
+async def _load_error(reader: StreamReader) -> Exception:
+    string = await _decode_until_crlf(reader)
+    return Exception(string)
+
+
+async def _load_integer(reader: StreamReader) -> int:
+    string = await _decode_until_crlf(reader)
+    return int(string)
+
+
+async def _load(reader: StreamReader) -> Serializable:
+    prefix = await reader.read(1)
+    match prefix:
+        case b'':
+            return b''
+        case b'*':
+            return await _load_array(reader)
+        case b'$':
+            return await _load_bulk_string(reader)
+        case b'+':
+            return await _load_string(reader)
+        case b':':
+            return await _load_integer(reader)
+        case b'-':
+            return await _load_error(reader)
+        case _:
+            raise ValueError('Invalid prefix {prefix!r}')
 
 
 class LoadError(Exception):
     pass
 
 
-async def load_command(reader: StreamReader) -> Sequence[bytes]:
-    """Deserialize reader to a Python object representing a command."""
-    prefix = await reader.read(1)
-    if prefix == b'':
-        return []
+async def load(reader: StreamReader) -> Serializable:
+    """Deserialize from reader to a Python object."""
     try:
-        obj = await _load_array_bulk_string(prefix, reader)
+        obj = await _load(reader)
     except Exception as e:
         raise LoadError('Invalid data') from e
     return obj

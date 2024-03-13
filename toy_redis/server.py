@@ -10,7 +10,7 @@ from collections.abc import MutableMapping
 from functools import partial
 
 from .command import CommandError, run
-from .wire import dump, load_command
+from .wire import dump, load
 
 Storage = MutableMapping[bytes, bytes]
 
@@ -19,7 +19,7 @@ async def _command_loop(storage: Storage,
                         reader: StreamReader,
                         writer: StreamWriter
                         ) -> None:
-    while (command := await load_command(reader)):
+    while (command := await load(reader)):
         try:
             response = run(storage, command)
         except CommandError as e:

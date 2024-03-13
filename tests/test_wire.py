@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from toy_redis.wire import dump, load_command, LoadError
+from toy_redis.wire import dump, load, LoadError
 
 
 @pytest.fixture
@@ -28,16 +28,6 @@ def stream_writer(buf):
 
 
 @pytest.fixture
-def command():
-    return [b'command', b'arg']
-
-
-@pytest.fixture
-def serialized_command():
-    return b'*2\r\n$7\r\ncommand\r\n$3\r\narg\r\n'
-
-
-@pytest.fixture
 def obj():
     return [None, b'abc', 'de', 42, Exception('Error')]
 
@@ -47,24 +37,26 @@ def serialized_obj():
     return b'*5\r\n$-1\r\n$3\r\nabc\r\n+de\r\n:42\r\n-Error\r\n'
 
 
-async def test_load_valid_command(command, serialized_command, stream_reader):
-    stream_reader.feed_data(serialized_command)
-    got = await load_command(stream_reader)
-    assert command == got
+async def test_load_supported_types(obj, serialized_obj, stream_reader):
+    stream_reader.feed_data(serialized_obj)
+    *objs, error = await load(stream_reader)
+    assert objs == [None, b'abc', 'de', 42]
+    assert isinstance(error, Exception)
+    assert str(error) == 'Error'
 
 
-async def test_load_eof_is_empty_command(stream_reader):
+async def test_load_eof(stream_reader):
     stream_reader.feed_eof()
-    got = await load_command(stream_reader)
-    assert [] == got
+    got = await load(stream_reader)
+    assert b'' == got
 
 
-async def test_load_invalid_command(stream_reader):
+async def test_load_invalid_data(stream_reader):
     data = '%-8a7'.encode()
     stream_reader.feed_data(data)
     stream_reader.feed_eof()
     with pytest.raises(LoadError) as excinfo:
-        await load_command(stream_reader)
+        await load(stream_reader)
     assert 'Invalid data' in str(excinfo)
 
 

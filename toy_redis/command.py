@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, MutableMapping, Sequence
 from itertools import pairwise
+from typing import Any
 
 Storage = MutableMapping[bytes, bytes]
 Result = str | int | bytes | None | Sequence[bytes | None]
@@ -47,7 +48,7 @@ class CommandError(Exception):
     pass
 
 
-def run(storage: Storage, run_args: Sequence[bytes]) -> Result:
+def run(storage: Storage, run_args: Any) -> Result:
     """Run command."""
     command, *args = run_args
     command_name = command.decode().lower()
