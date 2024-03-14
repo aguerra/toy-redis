@@ -14,51 +14,34 @@ async def _decode_until_crlf(reader: StreamReader) -> str:
     return trimmed.decode()
 
 
-async def _load_bulk_string(reader: StreamReader) -> bytes | None:
-    string = await _decode_until_crlf(reader)
-    length = int(string)
+async def _load_bulk_string(reader: StreamReader, length: int) -> bytes | None:
     if length == -1:
         return None
     data = await reader.read(length + 2)
     return data[:-2]
 
 
-async def _load_array(reader: StreamReader) -> SerializableSequence:
-    string = await _decode_until_crlf(reader)
-    length = int(string)
+async def _load_array(reader: StreamReader,
+                      length: int) -> SerializableSequence:
     obj = [await _load(reader) for _ in range(length)]
     return obj
 
 
-async def _load_string(reader: StreamReader) -> str:
-    return await _decode_until_crlf(reader)
-
-
-async def _load_error(reader: StreamReader) -> Exception:
-    string = await _decode_until_crlf(reader)
-    return Exception(string)
-
-
-async def _load_integer(reader: StreamReader) -> int:
-    string = await _decode_until_crlf(reader)
-    return int(string)
-
-
 async def _load(reader: StreamReader) -> Serializable:
-    prefix = await reader.read(1)
+    if not (prefix := await reader.read(1)):
+        return b''
+    decoded = await _decode_until_crlf(reader)
     match prefix:
-        case b'':
-            return b''
         case b'*':
-            return await _load_array(reader)
+            return await _load_array(reader, int(decoded))
         case b'$':
-            return await _load_bulk_string(reader)
+            return await _load_bulk_string(reader, int(decoded))
         case b'+':
-            return await _load_string(reader)
+            return decoded
         case b':':
-            return await _load_integer(reader)
+            return int(decoded)
         case b'-':
-            return await _load_error(reader)
+            return Exception(decoded)
         case _:
             raise ValueError('Invalid prefix {prefix!r}')
 
@@ -113,8 +96,8 @@ def _(obj: Exception) -> bytes:
 def _(obj: Sequence) -> bytes:
     length = len(obj)
     header = f'*{length}\r\n'.encode()
-    obj_data = b''.join(_to_bytes(item) for item in obj)
-    data = b''.join([header, obj_data])
+    items_data = b''.join(_to_bytes(item) for item in obj)
+    data = b''.join([header, items_data])
     return data
 
 
