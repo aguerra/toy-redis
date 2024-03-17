@@ -3,9 +3,15 @@
 from asyncio import StreamReader, StreamWriter
 from collections.abc import Sequence
 from functools import singledispatch
+from typing import NamedTuple
+
+
+class Error(NamedTuple):
+    message: str
+
 
 SerializableSequence = Sequence['Serializable']
-Serializable = None | int | str | bytes | Exception | SerializableSequence
+Serializable = None | int | str | bytes | Error | SerializableSequence
 
 
 async def _decode_until_crlf(reader: StreamReader) -> str:
@@ -41,7 +47,7 @@ async def _load(reader: StreamReader) -> Serializable:
         case b':':
             return int(decoded)
         case b'-':
-            return Exception(decoded)
+            return Error(decoded)
         case _:
             raise ValueError('Invalid prefix {prefix!r}')
 
@@ -86,8 +92,8 @@ def _(obj: bytes) -> bytes:
 
 
 @_to_bytes.register
-def _(obj: Exception) -> bytes:
-    message = str(obj)
+def _(obj: Error) -> bytes:
+    message = obj.message
     data = f'-{message}\r\n'.encode()
     return data
 

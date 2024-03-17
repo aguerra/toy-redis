@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from toy_redis.wire import dump, load, LoadError
+from toy_redis.wire import dump, load, Error, LoadError
 
 
 @pytest.fixture
@@ -12,14 +12,14 @@ def stream_reader():
 
 
 @pytest.fixture
-def buf():
+def buffer():
     return bytearray()
 
 
 @pytest.fixture
-def stream_writer(buf):
+def stream_writer(buffer):
     def write(data):
-        buf.extend(data)
+        buffer.extend(data)
 
     stream_writer = mock.Mock()
     stream_writer.write = write
@@ -29,20 +29,18 @@ def stream_writer(buf):
 
 @pytest.fixture
 def obj():
-    return [None, b'abc', 'de', 42, Exception('Error')]
+    return [None, ['z'], b'abc', 'de', 42, Error('Error')]
 
 
 @pytest.fixture
 def serialized_obj():
-    return b'*5\r\n$-1\r\n$3\r\nabc\r\n+de\r\n:42\r\n-Error\r\n'
+    return b'*6\r\n$-1\r\n*1\r\n+z\r\n$3\r\nabc\r\n+de\r\n:42\r\n-Error\r\n'
 
 
 async def test_load_supported_types(obj, serialized_obj, stream_reader):
     stream_reader.feed_data(serialized_obj)
-    *objs, error = await load(stream_reader)
-    assert objs == [None, b'abc', 'de', 42]
-    assert isinstance(error, Exception)
-    assert str(error) == 'Error'
+    got = await load(stream_reader)
+    assert got == obj
 
 
 async def test_load_eof(stream_reader):
@@ -60,6 +58,6 @@ async def test_load_invalid_data(stream_reader):
     assert 'Invalid data' in str(excinfo)
 
 
-async def test_dump_supported_types(buf, obj, serialized_obj, stream_writer):
+async def test_dump_supported_types(buffer, obj, serialized_obj, stream_writer):
     await dump(obj, stream_writer)
-    assert serialized_obj == buf
+    assert serialized_obj == buffer
