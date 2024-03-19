@@ -1,7 +1,10 @@
 import pytest
 
-from toy_redis.command import CommandError, run
-
+from toy_redis.command import (
+    CommandNotImplementedError,
+    InvalidCommandError,
+    run,
+)
 
 @pytest.fixture
 def storage():
@@ -43,7 +46,7 @@ def test_run_mset(storage):
 
 
 def test_run_del(storage):
-    key = 'key'
+    key = b'key'
     storage[key] = 42
     got = run(storage, [b'DEL', key])
     assert 1 == got
@@ -59,6 +62,18 @@ def test_run_flushdb(storage):
 
 
 def test_run_command_not_implemented(storage):
-    with pytest.raises(CommandError) as excinfo:
+    with pytest.raises(CommandNotImplementedError) as excinfo:
         run(storage, [b'INVALID'])
-    assert 'Command not implemented' in str(excinfo)
+    assert 'command invalid' in str(excinfo)
+
+
+def test_run_invalid_command_not_iterable(storage):
+    with pytest.raises(InvalidCommandError) as excinfo:
+        run(storage, 42)
+    assert 'command is not iterable' in str(excinfo)
+
+
+def test_run_invalid_command_name_and_args(storage):
+    with pytest.raises(InvalidCommandError) as excinfo:
+        run(storage, ['key', 'value'])
+    assert 'command name and arguments are not bytes' in str(excinfo)

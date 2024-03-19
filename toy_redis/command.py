@@ -48,24 +48,29 @@ class CommandError(Exception):
     pass
 
 
-def run(storage: Storage, run_args: Any) -> Result:
-    """Run command."""
-    command, *args = run_args
-    command_name = command.decode().lower()
-    func: Command
-    match command_name:
-        case 'get':
-            func = _get
-        case 'set':
-            func = _set
-        case 'mget':
-            func = _mget
-        case 'mset':
-            func = _mset
-        case 'del':
-            func = _del
-        case 'flushdb':
-            func = _flushdb
-        case _:
-            raise CommandError('Command not implemented')
+class InvalidCommandError(CommandError):
+    pass
+
+
+class CommandNotImplementedError(CommandError):
+    pass
+
+
+def _command_name_and_args(command: Any) -> tuple[bytes, list[bytes]]:
+    try:
+        command_name, *args = command
+    except TypeError as e:
+        raise InvalidCommandError('command is not iterable ') from e
+    if not all(isinstance(elem, bytes) for elem in command):
+        raise InvalidCommandError('command name and arguments are not bytes')
+    return command_name, args
+
+
+def run(storage: Storage, command: Any) -> Result:
+    """Run a server command."""
+    command_name, args = _command_name_and_args(command)
+    cmd_name_normalized = command_name.decode().lower()
+    func = globals().get('_' + cmd_name_normalized)
+    if func is None:
+        raise CommandNotImplementedError(f'command {cmd_name_normalized}')
     return func(storage, args)
