@@ -76,4 +76,4 @@ def test_run_invalid_command_not_iterable(storage):
 def test_run_invalid_command_name_and_args(storage):
     with pytest.raises(InvalidCommandError) as excinfo:
         run(storage, ['key', 'value'])
-    assert 'command name and arguments are not bytes' in str(excinfo)
+    assert 'command name or arguments are not bytes' in str(excinfo)

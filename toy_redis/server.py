@@ -6,16 +6,13 @@ from asyncio import (
     StreamWriter,
     start_server,
 )
-from collections.abc import MutableMapping
 from functools import partial
 
 from .command import CommandError, run
 from .wire import dump, load, Error
 
-Storage = MutableMapping[bytes, bytes]
 
-
-async def _command_loop(storage: Storage,
+async def _command_loop(storage: dict[bytes, bytes],
                         reader: StreamReader,
                         writer: StreamWriter
                         ) -> None:
