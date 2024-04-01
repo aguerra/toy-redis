@@ -30,7 +30,7 @@ async def _load_bulk_string(reader: StreamReader, length: int) -> bytes | None:
 async def _load_array(reader: StreamReader,
                       length: int) -> SerializableSequence:
     obj = [await _load(reader) for _ in range(length)]
-    return obj
+    return tuple(obj)
 
 
 async def _load(reader: StreamReader) -> Serializable:
