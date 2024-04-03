@@ -1,14 +1,14 @@
 """Server implementation."""
 
 from asyncio import (
-    run as asyncio_run,
+    run,
     StreamReader,
     StreamWriter,
     start_server,
 )
 from functools import partial
 
-from .command import CommandError, run
+from .command import cast_to_command_and_run, CommandError
 from .wire import dump, load, Error
 
 
@@ -16,9 +16,9 @@ async def _command_loop(storage: dict[bytes, bytes],
                         reader: StreamReader,
                         writer: StreamWriter
                         ) -> None:
-    while (command := await load(reader)):
+    while (data := await load(reader)):
         try:
-            response = run(storage, command)
+            response = cast_to_command_and_run(data, storage)
         except CommandError as e:
             response = Error(str(e))  # type: ignore
         await dump(response, writer)
@@ -33,4 +33,4 @@ async def start_and_serve_forever() -> None:
     await server.serve_forever()
 
 if __name__ == '__main__':
-    asyncio_run(start_and_serve_forever())
+    run(start_and_serve_forever())

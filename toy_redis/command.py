@@ -1,35 +1,36 @@
 """Server commands implementation."""
 
+from collections.abc import MutableMapping, Sequence
 from itertools import pairwise
 from typing import Any
 
-Storage = dict[bytes, bytes]
-Result = str | int | bytes | None | list[bytes | None]
+Storage = MutableMapping[bytes, bytes]
+Response = str | int | bytes | None | Sequence[bytes | None]
 
 
-def _get(storage: Storage, args: list[bytes]) -> bytes | None:
+def _get(storage: Storage, args: Sequence[bytes]) -> bytes | None:
     key, *_ = args
     return storage.get(key)
 
 
-def _mget(storage: Storage, args: list[bytes]) -> list[bytes | None]:
-    result = [storage.get(key) for key in args]
-    return result
+def _mget(storage: Storage, args: Sequence[bytes]) -> Sequence[bytes | None]:
+    response = tuple(storage.get(key) for key in args)
+    return response
 
 
-def _set(storage: Storage, args: list[bytes]) -> str:
+def _set(storage: Storage, args: Sequence[bytes]) -> str:
     key, value, *_ = args
     storage[key] = value
     return 'OK'
 
 
-def _mset(storage: Storage, args: list[bytes]) -> str:
+def _mset(storage: Storage, args: Sequence[bytes]) -> str:
     for key, value in pairwise(args):
         storage[key] = value
     return 'OK'
 
 
-def _del(storage: Storage, args: list[bytes]) -> int:
+def _del(storage: Storage, args: Sequence[bytes]) -> int:
     n = 0
     for key in args:
         if storage.pop(key, None):
@@ -37,7 +38,7 @@ def _del(storage: Storage, args: list[bytes]) -> int:
     return n
 
 
-def _flushdb(storage: Storage, args: list[bytes]) -> str:
+def _flushdb(storage: Storage, args: Sequence[bytes]) -> str:
     storage.clear()
     return 'OK'
 
@@ -54,19 +55,19 @@ class CommandNotImplementedError(CommandError):
     pass
 
 
-def _command_name_and_args(command: Any) -> tuple[bytes, list[bytes]]:
+def _command_name_and_args(data: Any) -> tuple[bytes, Sequence[bytes]]:
     try:
-        command_name, *args = command
+        command_name, *args = data
     except TypeError as e:
-        raise InvalidCommandError('command is not iterable ') from e
-    if not all(isinstance(elem, bytes) for elem in command):
-        raise InvalidCommandError('command name or arguments are not bytes')
+        raise InvalidCommandError('data is not iterable ') from e
+    if not all(isinstance(elem, bytes) for elem in data):
+        raise InvalidCommandError('command_name or arguments are not bytes')
     return command_name, args
 
 
-def run(storage: Storage, command: Any) -> Result:
-    """Run a server command."""
-    command_name, args = _command_name_and_args(command)
+def cast_to_command_and_run(data: Any, storage: Storage) -> Response:
+    """Cast data to server command and run it."""
+    command_name, args = _command_name_and_args(data)
     cmd_name_normalized = command_name.decode().lower()
     func = globals().get('_' + cmd_name_normalized)
     if func is None:
