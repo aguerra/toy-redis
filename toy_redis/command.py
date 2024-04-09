@@ -59,9 +59,11 @@ def _command_name_and_args(data: Any) -> tuple[bytes, Sequence[bytes]]:
     try:
         command_name, *args = data
     except TypeError as e:
-        raise InvalidCommandError('data is not iterable ') from e
-    if not all(isinstance(elem, bytes) for elem in data):
-        raise InvalidCommandError('command_name or arguments are not bytes')
+        raise InvalidCommandError('command is not iterable ') from e
+    if not isinstance(command_name, bytes):
+        raise InvalidCommandError('command_name is not bytes')
+    if not all(isinstance(arg, bytes) for arg in args):
+        raise InvalidCommandError('arguments are not bytes')
     return command_name, args
 
 

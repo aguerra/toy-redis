@@ -71,10 +71,16 @@ def test_command_not_implemented(storage):
 def test_invalid_command_not_iterable(storage):
     with pytest.raises(InvalidCommandError) as excinfo:
         cast_to_command_and_run(42, storage)
-    assert 'data is not iterable' in str(excinfo)
+    assert 'command is not iterable' in str(excinfo)
 
 
-def test_invalid_command_name_or_args(storage):
+def test_invalid_command_name(storage):
     with pytest.raises(InvalidCommandError) as excinfo:
         cast_to_command_and_run(['key', 'value'], storage)
-    assert 'command_name or arguments are not bytes' in str(excinfo)
+    assert 'command_name is not bytes' in str(excinfo)
+
+
+def test_invalid_command_args(storage):
+    with pytest.raises(InvalidCommandError) as excinfo:
+        cast_to_command_and_run([b'key', 'value'], storage)
+    assert 'arguments are not bytes' in str(excinfo)
