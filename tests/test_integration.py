@@ -27,27 +27,27 @@ async def redis():
     await r.aclose()
 
 
-async def test_run_set(redis):
+async def test_set(redis):
     got = await redis.set('foo', 'bar')
     assert got is True
 
 
-async def test_run_get(redis):
+async def test_get(redis):
     got = await redis.get('foo')
     assert b'bar' == got
 
 
-async def test_run_mset(redis):
+async def test_mset(redis):
     got = await redis.mset({'key1': 'value1', 'key2': 'value2'})
     assert got is True
 
 
-async def test_run_mget(redis):
+async def test_mget(redis):
     got = await redis.mget('key1', 'key2', 'foo')
     assert [b'value1', b'value2', b'bar'] == got
 
 
-async def test_run_delete(redis):
+async def test_delete(redis):
     key = 'key1'
     got = await redis.delete(key)
     value = await redis.get(key)
@@ -55,7 +55,7 @@ async def test_run_delete(redis):
     assert value is None
 
 
-async def test_run_flushdb(redis):
+async def test_flushdb(redis):
     got = await redis.flushdb()
     values = await redis.mget('key2', 'foo')
     assert got is True
