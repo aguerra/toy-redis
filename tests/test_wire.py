@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from toy_redis.wire import dump, load, Error as WireError, LoadError
+from toy_redis.wire import dump, load, Error
 
 
 @pytest.fixture
@@ -29,12 +29,12 @@ def stream_writer(stream_writer_buffer):
 
 @pytest.fixture
 def obj():
-    return None, ('z',), b'abc', 'de', 42, WireError('Error')
+    return None, ('z',), b'abc', 'de', 42, Error('Failed')
 
 
 @pytest.fixture
 def serialized_obj():
-    return b'*6\r\n$-1\r\n*1\r\n+z\r\n$3\r\nabc\r\n+de\r\n:42\r\n-Error\r\n'
+    return b'*6\r\n$-1\r\n*1\r\n+z\r\n$3\r\nabc\r\n+de\r\n:42\r\n-Failed\r\n'
 
 
 async def test_load_supported_types(obj, serialized_obj, stream_reader):
@@ -48,13 +48,14 @@ async def test_load_eof(stream_reader):
     got = await load(stream_reader)
     assert b'' == got
 
-async def test_load_invalid_data(stream_reader):
+
+async def test_load_unsupported_prefix(stream_reader):
     data = '%-8a7'.encode()
     stream_reader.feed_data(data)
-    stream_reader.feed_eof()
-    with pytest.raises(LoadError) as excinfo:
-        await load(stream_reader)
-    assert 'Invalid data' in str(excinfo)
+    got = await load(stream_reader)
+    prefix = b'%'
+    expected = Error(f'Unsupported prefix {prefix!r}')
+    assert got == expected
 
 
 async def test_dump_supported_types(stream_writer_buffer,

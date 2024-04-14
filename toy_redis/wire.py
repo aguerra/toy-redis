@@ -20,48 +20,54 @@ async def _decode_until_crlf(reader: StreamReader) -> str:
     return trimmed.decode()
 
 
-async def _load_bulk_string(reader: StreamReader, length: int) -> bytes | None:
-    if length == -1:
+async def _decode_integer(reader: StreamReader) -> int:
+    string = await _decode_until_crlf(reader)
+    return int(string)
+
+
+async def _load_bulk_string(reader: StreamReader) -> bytes | None:
+    if (length := await _decode_integer(reader)) == -1:
         return None
     data = await reader.read(length + 2)
     return data[:-2]
 
 
-async def _load_array(reader: StreamReader,
-                      length: int) -> SerializableSequence:
+async def _load_array(reader: StreamReader) -> SerializableSequence:
+    length = await _decode_integer(reader)
     obj = [await _load(reader) for _ in range(length)]
     return tuple(obj)
+
+
+async def _load_string(reader: StreamReader) -> str:
+    return await _decode_until_crlf(reader)
+
+
+async def _load_error(reader: StreamReader) -> Error:
+    string = await _decode_until_crlf(reader)
+    return Error(string)
 
 
 async def _load(reader: StreamReader) -> Serializable:
     if not (prefix := await reader.read(1)):
         return b''
-    decoded = await _decode_until_crlf(reader)
     match prefix:
         case b'*':
-            return await _load_array(reader, int(decoded))
+            return await _load_array(reader)
         case b'$':
-            return await _load_bulk_string(reader, int(decoded))
+            return await _load_bulk_string(reader)
         case b'+':
-            return decoded
+            return await _load_string(reader)
         case b':':
-            return int(decoded)
+            return await _decode_integer(reader)
         case b'-':
-            return Error(decoded)
+            return await _load_error(reader)
         case _:
-            raise ValueError('Invalid prefix {prefix!r}')
-
-
-class LoadError(Exception):
-    pass
+            return Error(f'Unsupported prefix {prefix!r}')
 
 
 async def load(reader: StreamReader) -> Serializable:
     """Deserialize from reader to a Python object."""
-    try:
-        obj = await _load(reader)
-    except Exception as e:
-        raise LoadError('Invalid data') from e
+    obj = await _load(reader)
     return obj
 
 
