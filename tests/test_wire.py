@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from toy_redis.wire import dump, load, Error
+from toy_redis.wire import dump, load, LoadError, ProtocolError
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def stream_writer(stream_writer_buffer):
 
 @pytest.fixture
 def obj():
-    return None, ('z',), b'abc', 'de', 42, Error('Failed')
+    return None, ('z',), b'abc', 'de', 42, ProtocolError('Failed')
 
 
 @pytest.fixture
@@ -49,13 +49,12 @@ async def test_load_eof(stream_reader):
     assert b'' == got
 
 
-async def test_load_unsupported_prefix(stream_reader):
+async def test_load_invalid_prefix(stream_reader):
     data = '%-8a7'.encode()
     stream_reader.feed_data(data)
-    got = await load(stream_reader)
-    prefix = b'%'
-    expected = Error(f'Unsupported prefix {prefix!r}')
-    assert got == expected
+    with pytest.raises(LoadError) as excinfo:
+        await load(stream_reader)
+    assert 'Invalid prefix' in str(excinfo)
 
 
 async def test_dump_supported_types(stream_writer_buffer,

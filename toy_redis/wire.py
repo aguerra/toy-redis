@@ -1,17 +1,26 @@
 """Serialization and deserialization for the wire protocol."""
 
-from asyncio import StreamReader, StreamWriter
+from asyncio import (
+    IncompleteReadError,
+    LimitOverrunError,
+    StreamReader,
+    StreamWriter,
+)
 from collections.abc import Sequence
 from functools import singledispatch
 from typing import NamedTuple
 
 
-class Error(NamedTuple):
+class ProtocolError(NamedTuple):
     message: str
 
 
+class LoadError(Exception):
+    pass
+
+
 SerializableSequence = Sequence['Serializable']
-Serializable = None | int | str | bytes | Error | SerializableSequence
+Serializable = None | int | str | bytes | ProtocolError | SerializableSequence
 
 
 async def _decode_until_crlf(reader: StreamReader) -> str:
@@ -42,9 +51,9 @@ async def _load_string(reader: StreamReader) -> str:
     return await _decode_until_crlf(reader)
 
 
-async def _load_error(reader: StreamReader) -> Error:
+async def _load_protocol_error(reader: StreamReader) -> ProtocolError:
     string = await _decode_until_crlf(reader)
-    return Error(string)
+    return ProtocolError(string)
 
 
 async def _load(reader: StreamReader) -> Serializable:
@@ -60,14 +69,23 @@ async def _load(reader: StreamReader) -> Serializable:
         case b':':
             return await _decode_integer(reader)
         case b'-':
-            return await _load_error(reader)
+            return await _load_protocol_error(reader)
         case _:
-            return Error(f'Unsupported prefix {prefix!r}')
+            raise LoadError(f'Invalid prefix {prefix!r}')
 
 
 async def load(reader: StreamReader) -> Serializable:
     """Deserialize from reader to a Python object."""
-    obj = await _load(reader)
+    try:
+        obj = await _load(reader)
+    except IncompleteReadError as e:
+        raise LoadError('Missing separator') from e
+    except LimitOverrunError as e:
+        raise LoadError('Request is too big') from e
+    except UnicodeError as e:
+        raise LoadError('Invalid encoding') from e
+    except ValueError as e:
+        raise LoadError('Invalid number') from e
     return obj
 
 
@@ -98,7 +116,7 @@ def _(obj: bytes) -> bytes:
 
 
 @_to_bytes.register
-def _(obj: Error) -> bytes:
+def _(obj: ProtocolError) -> bytes:
     message = obj.message
     data = f'-{message}\r\n'.encode()
     return data

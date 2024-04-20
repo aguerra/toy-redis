@@ -12,22 +12,34 @@ from collections.abc import MutableMapping
 from functools import partial
 
 from .command import cast_to_command_and_run, CommandError
-from .wire import dump, load, Error as WireError
+from .wire import dump, load, LoadError, ProtocolError, Serializable
 
 logger = logging.getLogger(__name__)
+
+async def _load_request(reader: StreamReader, address: str) -> Serializable:
+    try:
+        request = await load(reader)
+    except LoadError as e:
+        request = ProtocolError(str(e))
+    except Exception as e:
+        message = 'Internal server error'
+        request = ProtocolError(message)
+        logger.exception(f'address={address} message={message}')
+    return request
+
 
 async def _command_loop(storage: MutableMapping[bytes, bytes],
                         reader: StreamReader,
                         writer: StreamWriter
                         ) -> None:
-    while (data := await load(reader)):
-        address = writer.get_extra_info('peername')
-        logger.debug(f'request={data} address={address}')
+    address = writer.get_extra_info('peername')
+    while (request := await _load_request(reader, address)):
+        logger.debug(f'request={request} address={address}')
         try:
-            response = cast_to_command_and_run(data, storage)
+            response = cast_to_command_and_run(request, storage)
         except CommandError as e:
             logger.exception(f'address={address}')
-            response = WireError(str(e))  # type: ignore
+            response = ProtocolError(str(e))  # type: ignore
         logger.debug(f'response={response!r} address={address}')
         await dump(response, writer)
     logger.debug(f'request=EOF address={address}')
