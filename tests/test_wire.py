@@ -12,6 +12,11 @@ def stream_reader():
 
 
 @pytest.fixture
+def limited_stream_reader():
+    return StreamReader(limit=1)
+
+
+@pytest.fixture
 def stream_writer_buffer():
     return bytearray()
 
@@ -50,11 +55,44 @@ async def test_load_eof(stream_reader):
 
 
 async def test_load_invalid_prefix(stream_reader):
-    data = '%-8a7'.encode()
+    data = b'%-8a7'
     stream_reader.feed_data(data)
     with pytest.raises(LoadError) as excinfo:
         await load(stream_reader)
     assert 'Invalid prefix' in str(excinfo)
+
+
+async def test_load_missing_separator(stream_reader):
+    data = b'*6$-1'
+    stream_reader.feed_data(data)
+    stream_reader.feed_eof()
+    with pytest.raises(LoadError) as excinfo:
+        await load(stream_reader)
+    assert 'Missing separator' in str(excinfo)
+
+
+async def test_load_invalid_encoding(stream_reader):
+    data = b'*6\xa0\r\n'
+    stream_reader.feed_data(data)
+    with pytest.raises(LoadError) as excinfo:
+        await load(stream_reader)
+    assert 'Invalid encoding' in str(excinfo)
+
+
+async def test_load_invalid_number(stream_reader):
+    data = b':b\r\n'
+    stream_reader.feed_data(data)
+    with pytest.raises(LoadError) as excinfo:
+        await load(stream_reader)
+    assert 'Invalid number' in str(excinfo)
+
+
+async def test_load_request_too_big(limited_stream_reader):
+    data = b':42\r\n'
+    limited_stream_reader.feed_data(data)
+    with pytest.raises(LoadError) as excinfo:
+        await load(limited_stream_reader)
+    assert 'Request is too big' in str(excinfo)
 
 
 async def test_dump_supported_types(stream_writer_buffer,

@@ -80,7 +80,7 @@ async def load(reader: StreamReader) -> Serializable:
         obj = await _load(reader)
     except IncompleteReadError as e:
         raise LoadError('Missing separator') from e
-    except LimitOverrunError as e:
+    except (LimitOverrunError, RecursionError) as e:
         raise LoadError('Request is too big') from e
     except UnicodeError as e:
         raise LoadError('Invalid encoding') from e
@@ -103,8 +103,7 @@ def _(obj: str | int) -> bytes:
 
 @_to_bytes.register
 def _(obj: None) -> bytes:
-    data = '$-1\r\n'.encode()
-    return data
+    return b'$-1\r\n'
 
 
 @_to_bytes.register
