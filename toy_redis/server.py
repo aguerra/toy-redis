@@ -39,7 +39,7 @@ async def _command_loop(storage: Storage,
 async def _log_exception_and_dump(response: Serializable,
                                   writer: StreamWriter,
                                   address: str
-                                        ) -> None:
+                                  ) -> None:
     logger.exception(f'address={address}')
     await dump(response, writer)
 
